@@ -1,0 +1,106 @@
+# ============================================================================
+#  Ontology Reasoning Server - default configuration
+#
+#  Any value can be overridden by:
+#    1. ./config/application.properties  (external file, loaded automatically)
+#    2. environment variables           (app.datasource.tdsql.url -> APP_DATASOURCE_TDSQL_URL)
+#    3. JVM system properties           (-Dapp.datasource.tdsql.url=...)
+# ============================================================================
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: ontology-reasoning-server
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 24MB
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+  mvc:
+    throw-exception-if-no-handler-found: false
+
+app:
+  # Directory where ontology / mapping files of loaded models are stored
+  # (the ontology definitions always stay on the local filesystem).
+  data-dir: ${APP_DATA_DIR:data/models}
+  # Default data source profile: tdsql | h2
+  default-profile: ${APP_DEFAULT_PROFILE:tdsql}
+  # Safety limits for REST responses
+  max-query-rows: ${APP_MAX_QUERY_ROWS:500}
+  max-inferred-sample: ${APP_MAX_INFERRED_SAMPLE:50}
+
+  # Inference results can be persisted to the relational store
+  reasoning:
+    materialize-enabled: ${APP_MATERIALIZE_ENABLED:true}
+    materialize-table: ${APP_MATERIALIZE_TABLE:inferred_triple}
+
+  # ---------------------------------------------------------------------------
+  # Document-driven ontology modeling (source documents -> T-Box + A-Box)
+  # ---------------------------------------------------------------------------
+  modeling:
+    data-dir: ${APP_MODELING_DATA_DIR:data/modeling}
+    namespace-base: ${APP_MODELING_NAMESPACE_BASE:http://example.org/model/}
+    chunk-size: ${APP_MODELING_CHUNK_SIZE:3500}
+    chunk-overlap: ${APP_MODELING_CHUNK_OVERLAP:200}
+    max-chunks: ${APP_MODELING_MAX_CHUNKS:15}
+    max-document-bytes: ${APP_MODELING_MAX_DOCUMENT_BYTES:5242880}
+    ai:
+      # ollama | openai | heuristic | mock
+      provider: ${APP_MODELING_AI_PROVIDER:ollama}
+      base-url: ${APP_MODELING_AI_BASE_URL:http://127.0.0.1:11434}
+      model: ${APP_MODELING_AI_MODEL:qwen2.5:7b}
+      api-key: ${APP_MODELING_AI_API_KEY:}
+      timeout-seconds: ${APP_MODELING_AI_TIMEOUT_SECONDS:180}
+      temperature: ${APP_MODELING_AI_TEMPERATURE:0.2}
+      fallback-to-heuristic: ${APP_MODELING_AI_FALLBACK_TO_HEURISTIC:true}
+
+  # Demo ontology / mapping / rules used when /load is called without sources
+  defaults:
+    ontology-path: ontology/company.ttl
+    mapping-path: mapping/company.obda
+    rules-path: ontology/company.rules
+
+  init:
+    schema-sql: sql/schema.sql
+    seed-sql: sql/seed.sql
+
+  datasource:
+    # TDSQL / MySQL (production): instances live in these relational tables
+    tdsql:
+      driver: com.mysql.cj.jdbc.Driver
+      url: jdbc:mysql://127.0.0.1:3306/ontology_db?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      username: ontology
+      password: ontology123
+    # Embedded H2 (MySQL compatibility mode) for zero-install demos and tests.
+    # One in-memory database is created per loaded model.
+    h2:
+      driver: org.h2.Driver
+      url-template: jdbc:h2:mem:onto_{modelId};MODE=MySQL;DB_CLOSE_DELAY=-1
+      username: sa
+      password: ""
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    root: INFO
+    com.example.ontology: INFO
+    it.unibz.inf.ontop: WARN
+    org.eclipse.rdf4j: WARN
+    org.apache.jena: WARN

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Optional Maven mirror for users in mainland China (Aliyun public mirror).
+  scripts/build.sh picks this file up automatically when ~/.m2/settings.xml
+  does not exist.  Delete the file or pass -s <your-settings> to override.
+
+  This file only affects dependency downloads; it is not used at runtime.
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+  <mirrors>
+    <mirror>
+      <id>aliyun-public</id>
+      <name>Aliyun public Maven mirror</name>
+      <url>https://maven.aliyun.com/repository/public</url>
+      <mirrorOf>central</mirrorOf>
+    </mirror>
+  </mirrors>
+</settings>

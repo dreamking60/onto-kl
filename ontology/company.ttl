@@ -1,0 +1,188 @@
+@prefix :      <http://example.org/company#> .
+@prefix owl:   <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+
+#############################################################################
+# Company Ontology (T-Box)
+#
+# This file is the *local* ontology definition of the system.  It is loaded
+# from disk by Jena 4.8 and is also handed to Ontop as the ontology of the
+# OBDA specification (Ontop uses it to validate the mapping / rewrite SPARQL).
+#
+# The A-Box (instances) is NOT stored here: it lives in TDSQL relational
+# tables and is virtualised as RDF by Ontop (see mapping/company.obda).
+#############################################################################
+
+<http://example.org/company>
+    a owl:Ontology ;
+    rdfs:label "Company Ontology"@en ;
+    rdfs:comment "T-Box for the Jena 4.8 + Ontop 5.5 + TDSQL ontology reasoning demo."@en .
+
+#############################################################################
+# 1. Class hierarchy
+#############################################################################
+
+:Person a owl:Class ;
+    rdfs:label "Person"@en ;
+    rdfs:comment "Any person in the organisation."@en .
+
+:Employee a owl:Class ;
+    rdfs:subClassOf :Person ;
+    rdfs:label "Employee"@en .
+
+# Alias class: anything classified as :Employee is also a :Staff member.
+# (owl:equivalentClass is one of the axioms Jena's OWL-mini reasoner handles.)
+:Staff a owl:Class ;
+    owl:equivalentClass :Employee ;
+    rdfs:label "Staff"@en .
+
+:Manager a owl:Class ;
+    rdfs:subClassOf :Employee ;
+    rdfs:label "Manager"@en ;
+    rdfs:comment "Inferred from :manages (whose domain is :Manager)."@en ;
+    rdfs:subClassOf [
+        a owl:Restriction ;
+        owl:onProperty :manages ;
+        owl:minCardinality "1"^^xsd:nonNegativeInteger
+    ] .
+
+:SeniorManager a owl:Class ;
+    rdfs:subClassOf :Manager ;
+    rdfs:label "Senior Manager"@en ;
+    rdfs:comment "Derived by a local Jena rule: manages at least one well-paid employee."@en .
+
+:Director a owl:Class ;
+    rdfs:subClassOf :Manager ;
+    rdfs:label "Director"@en ;
+    rdfs:comment "Derived by a local Jena rule: a manager who leads a department."@en .
+
+:OrganizationUnit a owl:Class ;
+    rdfs:label "Organisation Unit"@en .
+
+:Department a owl:Class ;
+    rdfs:subClassOf :OrganizationUnit ;
+    rdfs:label "Department"@en .
+
+:Project a owl:Class ;
+    rdfs:label "Project"@en .
+
+# Disjointness: useful for consistency checking / data quality rules.
+:Department owl:disjointWith :Project .
+:Person owl:disjointWith :Department , :Project .
+
+#############################################################################
+# 2. Object properties
+#############################################################################
+
+:manages a owl:ObjectProperty ;
+    rdfs:domain :Manager ;
+    rdfs:range :Employee ;
+    owl:inverseOf :managedBy ;
+    rdfs:label "manages"@en ;
+    rdfs:comment "Asserted nowhere in the database: derived from :managedBy (owl:inverseOf)."@en .
+
+:managedBy a owl:ObjectProperty ;
+    rdfs:domain :Employee ;
+    rdfs:range :Manager ;
+    rdfs:label "managed by"@en ;
+    rdfs:comment "Mapped from employee.manager_id in TDSQL."@en .
+
+:worksIn a owl:ObjectProperty ;
+    rdfs:domain :Employee ;
+    rdfs:range :Department ;
+    owl:inverseOf :hasMember ;
+    rdfs:label "works in"@en .
+
+:hasMember a owl:ObjectProperty ;
+    rdfs:domain :Department ;
+    rdfs:range :Employee ;
+    rdfs:label "has member"@en .
+
+:leadsDepartment a owl:ObjectProperty ;
+    rdfs:domain :Manager ;
+    rdfs:range :Department ;
+    owl:inverseOf :hasHead ;
+    rdfs:label "leads department"@en ;
+    rdfs:comment "Mapped from department.head_id in TDSQL."@en .
+
+:hasHead a owl:ObjectProperty ;
+    rdfs:domain :Department ;
+    rdfs:range :Manager ;
+    rdfs:label "has head"@en .
+
+:assignedTo a owl:ObjectProperty ;
+    rdfs:domain :Employee ;
+    rdfs:range :Project ;
+    owl:inverseOf :hasAssignee ;
+    rdfs:label "assigned to"@en ;
+    rdfs:comment "Mapped from the assignment join table in TDSQL."@en .
+
+:hasAssignee a owl:ObjectProperty ;
+    rdfs:domain :Project ;
+    rdfs:range :Employee ;
+    rdfs:label "has assignee"@en .
+
+:ownedBy a owl:ObjectProperty ;
+    rdfs:domain :Project ;
+    rdfs:range :Department ;
+    owl:inverseOf :owns ;
+    rdfs:label "owned by"@en .
+
+:owns a owl:ObjectProperty ;
+    rdfs:domain :Department ;
+    rdfs:range :Project ;
+    rdfs:label "owns"@en .
+
+:partOf a owl:ObjectProperty , owl:TransitiveProperty ;
+    rdfs:domain :OrganizationUnit ;
+    rdfs:range :OrganizationUnit ;
+    rdfs:label "part of"@en ;
+    rdfs:comment "Mapped from department.parent_id; transitivity is inferred by Jena."@en .
+
+:hasColleague a owl:ObjectProperty , owl:SymmetricProperty ;
+    rdfs:domain :Employee ;
+    rdfs:range :Employee ;
+    rdfs:label "has colleague"@en ;
+    rdfs:comment "Derived by a local Jena rule: two different employees in the same department."@en .
+
+:reportsTo a owl:ObjectProperty ;
+    rdfs:domain :Employee ;
+    rdfs:range :Manager ;
+    rdfs:label "reports to"@en ;
+    rdfs:comment "Derived by local Jena rules (base + transitive closure over the manager chain)."@en .
+
+#############################################################################
+# 3. Datatype properties
+#############################################################################
+
+:name a owl:DatatypeProperty ;
+    rdfs:domain :Person ;
+    rdfs:range xsd:string ;
+    rdfs:label "name"@en .
+
+:salary a owl:DatatypeProperty ;
+    rdfs:domain :Employee ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "salary"@en .
+
+:startDate a owl:DatatypeProperty ;
+    rdfs:domain :Employee ;
+    rdfs:range xsd:date ;
+    rdfs:label "start date"@en .
+
+:departmentName a owl:DatatypeProperty ;
+    rdfs:domain :Department ;
+    rdfs:range xsd:string ;
+    rdfs:label "department name"@en .
+
+:projectName a owl:DatatypeProperty ;
+    rdfs:domain :Project ;
+    rdfs:range xsd:string ;
+    rdfs:label "project name"@en .
+
+:budget a owl:DatatypeProperty ;
+    rdfs:domain :Project ;
+    rdfs:range xsd:decimal ;
+    rdfs:label "budget"@en .

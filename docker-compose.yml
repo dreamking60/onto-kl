@@ -1,0 +1,29 @@
+# Local MySQL 8 instance that stands in for TDSQL.
+# It creates the schema and the demo data automatically on first start.
+#
+#   docker compose up -d
+#   java -jar target/ontology-reasoning.jar demo            # profile=tdsql
+#
+# The default config/application.properties already points at this instance.
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: ontology-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_DATABASE: ontology_db
+      MYSQL_USER: ontology
+      MYSQL_PASSWORD: ontology123
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./sql/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot123"]
+      interval: 5s
+      timeout: 5s
+      retries: 30

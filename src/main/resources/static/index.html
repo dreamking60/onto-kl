@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>本体推理系统 · Jena 4.8 + Ontop 5.5 + TDSQL</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕸️</text></svg>">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-logo">🕸️</div>
+    <div class="brand-text">
+      <h1>本体推理系统</h1>
+      <p>Jena 4.8 · Ontop 5.5 · TDSQL · OBDA 虚拟图 + OWL 推理</p>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="health" id="health"><i class="dot"></i><span id="health-text">检测中…</span></span>
+    <a class="btn btn-ghost" href="/modeling.html" title="从法律/手册/书籍等文档生成本体定义与实例">🧩 本体建模</a>
+    <a class="btn btn-ghost" href="/swagger-ui.html" target="_blank" rel="noopener">Swagger</a>
+    <button class="btn btn-primary" id="btn-quick-demo" title="用内置 H2 加载演示模型并运行推理">⚡ 一键演示</button>
+  </div>
+</header>
+
+<main class="layout">
+  <aside class="sidebar">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>模型</h2>
+        <button class="icon-btn" id="btn-refresh-models" title="刷新模型列表">⟳</button>
+      </div>
+      <div id="model-list" class="model-list">
+        <div class="placeholder small">加载中…</div>
+      </div>
+      <button class="btn btn-secondary btn-block" id="btn-open-load">＋ 加载新模型</button>
+    </section>
+
+    <section class="panel tips">
+      <h3>演示流程</h3>
+      <ol>
+        <li><b>加载模型</b>：本地 T-Box + OBDA 映射 + TDSQL 实例</li>
+        <li><b>运行推理</b>：业务规则 + OWL 闭包</li>
+        <li><b>执行查询</b>：示例 SPARQL 查看推导结果</li>
+        <li><b>推导解释</b>：查看规则链与前提</li>
+      </ol>
+      <p class="muted small">数据源：TDSQL（默认）或内置 H2（零安装演示）。本体定义始终保存在本地文件。</p>
+    </section>
+  </aside>
+
+  <section class="content">
+    <div id="empty-state" class="empty-state">
+      <div class="empty-icon">🕸️</div>
+      <h2>还没有加载本体模型</h2>
+      <p>用「⚡ 一键演示」基于内置 H2 立即体验完整链路，或手动加载一个模型。</p>
+      <div class="empty-actions">
+        <button class="btn btn-primary" id="btn-empty-quick">⚡ 一键演示（内置 H2）</button>
+        <a class="btn btn-secondary" href="/modeling.html">🧩 从文档生成本体</a>
+        <button class="btn btn-secondary" id="btn-empty-load">手动加载模型</button>
+      </div>
+      <p class="empty-hint">手动加载示例：modelId = <code>company</code>，profile = <code>h2</code>（零安装）或 <code>tdsql</code>（需先初始化 TDSQL 表）。</p>
+    </div>
+
+    <div id="workspace" hidden>
+      <section class="card model-header">
+        <div class="model-title">
+          <div>
+            <h2 id="model-name">-</h2>
+            <p class="muted" id="model-id">-</p>
+          </div>
+          <div class="chips">
+            <span class="chip" id="chip-state">-</span>
+            <span class="chip chip-ghost" id="chip-profile">-</span>
+            <span class="chip chip-ghost" id="chip-db" title="">-</span>
+          </div>
+        </div>
+        <div class="model-actions">
+          <button class="btn btn-primary" id="btn-reason">运行推理</button>
+          <button class="btn btn-ghost" id="btn-refresh-detail">刷新</button>
+          <button class="btn btn-danger-ghost" id="btn-unload">卸载</button>
+        </div>
+      </section>
+
+      <section class="stat-grid" id="stat-grid"></section>
+
+      <nav class="tabs" id="tabs">
+        <button class="tab active" data-tab="query">SPARQL 查询</button>
+        <button class="tab" data-tab="reason">推理结果</button>
+        <button class="tab" data-tab="explain">推导解释</button>
+        <button class="tab" data-tab="detail">模型详情</button>
+      </nav>
+
+      <section class="tab-panel active" data-panel="query">
+        <div class="card">
+          <div class="card-head">
+            <h3>SPARQL 查询</h3>
+            <div class="row">
+              <label class="inline">行数上限
+                <input class="input input-sm" id="query-limit" type="number" min="1" max="10000" value="100">
+              </label>
+              <button class="btn btn-primary" id="btn-run-query">运行查询 <kbd>⌘/Ctrl ↵</kbd></button>
+            </div>
+          </div>
+          <div class="examples" id="query-examples"></div>
+          <textarea class="code-editor" id="query-editor" spellcheck="false">SELECT ?e ?name
+WHERE {
+  ?e a :SeniorManager ;
+     :name ?name .
+}
+ORDER BY ?name</textarea>
+          <p class="editor-hint">前缀 <code>:</code> <code>rdf:</code> <code>rdfs:</code> <code>owl:</code> <code>xsd:</code> 已由服务端预绑定；支持 SELECT / ASK / CONSTRUCT / DESCRIBE。</p>
+        </div>
+        <div class="card result-card" id="query-result">
+          <div class="placeholder">选择示例或输入 SPARQL 后运行，结果会显示在这里。</div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="reason">
+        <div class="card">
+          <div class="card-head">
+            <h3>推理</h3>
+            <div class="row">
+              <label class="inline checkbox"><input id="reason-materialize" type="checkbox" checked> 推理结果写入 inferred_triple</label>
+              <button class="btn btn-primary" id="btn-run-reason">运行推理</button>
+            </div>
+          </div>
+          <p class="muted">业务规则（Jena RuleReasoner，前向 RETE）+ OWL 推理闭包（OWL_MEM_MINI_RULE_INF）。首次运行会计算闭包，之后复用缓存。</p>
+        </div>
+        <div class="card result-card" id="reason-result">
+          <div class="placeholder">点击「运行推理」查看推导结果与统计信息。</div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="explain">
+        <div class="card">
+          <div class="card-head">
+            <h3>推导解释</h3>
+            <div class="row">
+              <input class="input" id="explain-subject" value=":emp/5" placeholder=":emp/5 或完整 IRI">
+              <label class="inline">条数
+                <input class="input input-sm" id="explain-limit" type="number" min="1" max="500" value="20">
+              </label>
+              <button class="btn btn-primary" id="btn-run-explain">解释</button>
+            </div>
+          </div>
+          <div class="examples" id="explain-examples"></div>
+        </div>
+        <div class="card result-card" id="explain-result">
+          <div class="placeholder">输入个体 IRI，查看每条推导语句的规则链和前提。</div>
+        </div>
+      </section>
+
+      <section class="tab-panel" data-panel="detail">
+        <div class="card">
+          <div class="card-head">
+            <h3>模型详情</h3>
+            <span class="muted small" id="detail-updated"></span>
+          </div>
+          <div id="detail-json" class="detail-grid"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>本地文件</h3></div>
+          <ul class="file-list" id="detail-files"></ul>
+        </div>
+        <div class="card danger">
+          <div class="card-head"><h3>危险操作</h3></div>
+          <p class="muted">卸载模型会关闭 Ontop/Jena 运行时并删除本地保存的本体/映射副本，不会修改 TDSQL 中的实例数据。</p>
+          <button class="btn btn-danger" id="btn-unload-2">卸载该模型</button>
+        </div>
+      </section>
+    </div>
+  </section>
+</main>
+
+<dialog class="dialog" id="load-dialog">
+  <form id="load-form">
+    <div class="dialog-head">
+      <h2>加载本体模型</h2>
+      <button type="button" class="icon-btn" id="btn-close-dialog" title="关闭">✕</button>
+    </div>
+    <div class="dialog-body">
+      <div class="form-grid">
+        <label>modelId
+          <input class="input" id="load-model-id" placeholder="留空自动生成，如 company">
+        </label>
+        <label>名称
+          <input class="input" id="load-name" placeholder="可选">
+        </label>
+      </div>
+
+      <label>数据源
+        <select class="input" id="load-profile">
+          <option value="">服务默认（tdsql）</option>
+          <option value="tdsql">tdsql（连接 TDSQL/MySQL）</option>
+          <option value="h2">h2（内置 H2，零安装）</option>
+        </select>
+      </label>
+
+      <label class="checkbox"><input type="checkbox" id="load-init-db"> initDatabase：先建表并灌演示数据（会 DROP + 重建，仅演示库使用）</label>
+
+      <fieldset class="source-group">
+        <legend>本体定义（T-Box）</legend>
+        <div class="segmented" data-source="ontology">
+          <label><input type="radio" name="ontology-mode" value="default" checked> 服务默认</label>
+          <label><input type="radio" name="ontology-mode" value="path"> 本地路径</label>
+          <label><input type="radio" name="ontology-mode" value="content"> 内联内容</label>
+        </div>
+        <input class="input" id="load-ontology-path" placeholder="ontology/company.ttl" hidden>
+        <textarea class="code-editor code-editor-sm" id="load-ontology-content" placeholder="@prefix : &lt;http://example.org/company#&gt; ." hidden></textarea>
+      </fieldset>
+
+      <fieldset class="source-group">
+        <legend>OBDA 映射</legend>
+        <div class="segmented" data-source="mapping">
+          <label><input type="radio" name="mapping-mode" value="default" checked> 服务默认</label>
+          <label><input type="radio" name="mapping-mode" value="path"> 本地路径</label>
+          <label><input type="radio" name="mapping-mode" value="content"> 内联内容</label>
+        </div>
+        <input class="input" id="load-mapping-path" placeholder="mapping/company.obda" hidden>
+        <textarea class="code-editor code-editor-sm" id="load-mapping-content" placeholder="[PrefixDeclaration] ..." hidden></textarea>
+      </fieldset>
+
+      <fieldset class="source-group">
+        <legend>业务规则（可选）</legend>
+        <div class="segmented" data-source="rules">
+          <label><input type="radio" name="rules-mode" value="default" checked> 服务默认</label>
+          <label><input type="radio" name="rules-mode" value="path"> 本地路径</label>
+          <label><input type="radio" name="rules-mode" value="content"> 内联内容</label>
+        </div>
+        <input class="input" id="load-rules-path" placeholder="ontology/company.rules" hidden>
+        <textarea class="code-editor code-editor-sm" id="load-rules-content" placeholder="[directorRule: ...]" hidden></textarea>
+      </fieldset>
+
+      <details class="advanced">
+        <summary>高级：覆盖 JDBC 连接</summary>
+        <div class="form-grid">
+          <label>jdbcUrl<input class="input" id="load-jdbc-url" placeholder="留空使用服务端配置"></label>
+          <label>用户名<input class="input" id="load-jdbc-username"></label>
+          <label>密码<input class="input" id="load-jdbc-password" type="password"></label>
+          <label>驱动类<input class="input" id="load-jdbc-driver" placeholder="com.mysql.cj.jdbc.Driver"></label>
+        </div>
+      </details>
+
+      <div class="error-box" id="load-error" hidden></div>
+
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-ghost" id="btn-cancel-load">取消</button>
+        <button type="submit" class="btn btn-primary" id="btn-submit-load">加载模型</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<div class="toasts" id="toasts"></div>
+<script src="/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+[PrefixDeclaration]
+:		http://example.org/company#
+xsd:		http://www.w3.org/2001/XMLSchema#
+rdf:		http://www.w3.org/1999/02/22-rdf-syntax-ns#
+
+[MappingDeclaration] @collection [[
+mappingId	employee
+target		:emp/{id} a :Employee ; :name {name} ; :salary {salary}^^xsd:decimal ; :startDate {start_date}^^xsd:date .
+source		SELECT id, name, salary, start_date FROM employee
+
+mappingId	employee_department
+target		:emp/{id} :worksIn :dept/{department_id} .
+source		SELECT id, department_id FROM employee WHERE department_id IS NOT NULL
+
+mappingId	employee_manager
+target		:emp/{id} :managedBy :emp/{manager_id} .
+source		SELECT id, manager_id FROM employee WHERE manager_id IS NOT NULL
+
+mappingId	department
+target		:dept/{id} a :Department ; :departmentName {name} .
+source		SELECT id, name FROM department
+
+mappingId	department_parent
+target		:dept/{id} :partOf :dept/{parent_id} .
+source		SELECT id, parent_id FROM department WHERE parent_id IS NOT NULL
+
+mappingId	department_head
+target		:emp/{head_id} :leadsDepartment :dept/{id} .
+source		SELECT id, head_id FROM department WHERE head_id IS NOT NULL
+
+mappingId	project
+target		:proj/{id} a :Project ; :projectName {name} ; :budget {budget}^^xsd:decimal .
+source		SELECT id, name, budget FROM project
+
+mappingId	project_department
+target		:proj/{id} :ownedBy :dept/{department_id} .
+source		SELECT id, department_id FROM project WHERE department_id IS NOT NULL
+
+mappingId	assignment
+target		:emp/{employee_id} :assignedTo :proj/{project_id} .
+source		SELECT employee_id, project_id FROM assignment
+]]

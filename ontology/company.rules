@@ -1,0 +1,50 @@
+@prefix :      <http://example.org/company#> .
+@prefix rdf:   <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs:  <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:   <http://www.w3.org/2001/XMLSchema#> .
+@prefix owl:   <http://www.w3.org/2002/07/owl#> .
+
+#############################################################################
+# Local business rules (Jena 4.8 forward-chaining rule engine, ARQL syntax).
+#
+# These are *application* rules layered on top of the OWL T-Box:
+#   - the OWL reasoner (OWL_MEM_MINI_RULE_INF) already handles rdfs:subClassOf,
+#     rdfs:domain/range, owl:inverseOf, owl:SymmetricProperty,
+#     owl:TransitiveProperty and owl:equivalentClass;
+#   - the rules below encode organisation-specific logic that OWL 2 cannot
+#     express as easily (or that we want to keep explicit and auditable).
+#
+# Syntax reminder: one complete rule per line:
+#   [ruleName: (premise ...), (premise ...) -> (conclusion ...)]
+# Arguments are Jena terms: ?var / <IRI> / "literal"^^xsd:type.
+#############################################################################
+
+# 1. A manager who leads a department is a Director.
+[directorRule:
+  (?m :leadsDepartment ?d)
+  -> (?m rdf:type :Director)]
+
+# 2. A manager with at least one direct report earning > 25000 is a
+#    SeniorManager.  (This is the kind of numeric business rule that is easy
+#    to express in the Jena rule engine.)
+[seniorManagerRule:
+  (?e :managedBy ?m), (?e :salary ?s), greaterThan(?s, 25000)
+  -> (?m rdf:type :SeniorManager)]
+
+# 3. Two different employees working in the same department are colleagues.
+#    :hasColleague is also declared owl:SymmetricProperty in the T-Box, so the
+#    OWL reasoner completes the reverse direction.
+[colleagueRule:
+  (?e1 :worksIn ?d), (?e2 :worksIn ?d), notEqual(?e1, ?e2)
+  -> (?e1 :hasColleague ?e2)]
+
+# 4. Direct reporting line: the inverse of the DB's employee.manager_id.
+[reportsToBaseRule:
+  (?e :managedBy ?m)
+  -> (?e :reportsTo ?m)]
+
+# 5. Transitive closure of the reporting line (employee -> manager -> director).
+#    The Jena RETE engine iterates these rules until a fixpoint is reached.
+[reportsToTransitiveRule:
+  (?e :reportsTo ?m), (?m :reportsTo ?boss)
+  -> (?e :reportsTo ?boss)]
